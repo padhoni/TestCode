@@ -1,0 +1,100 @@
+Sample Code:
+
+1.
+
+SELECT
+    t1.PartID,
+    t1.PartName,
+    t1.ManufacturingDate,
+    t1.Supplier,
+    t1.Quantity as Quantity_at_MES,
+    t2.Quantity as Quantity_at_ERP,
+    ABS(t1.Quantity - t2.Quantity) as Variance
+FROM
+    (SELECT PartID, PartName, ManufacturingDate, Supplier, Quantity FROM Central_Table WHERE ApplicationName = 'MES') t1
+JOIN
+    (SELECT PartID, PartName, ManufacturingDate, Supplier, Quantity FROM Central_Table WHERE ApplicationName = 'ERP') t2
+ON
+    t1.PartID = t2.PartID
+ORDER BY
+    t1.PartID;
+
+CREATE TABLE RuleDefinitions (
+    RuleID INT PRIMARY KEY,
+    RuleName VARCHAR(255),
+    VarianceThreshold INT
+);
+
+
+##################################
+2.
+INSERT INTO RuleDefinitions (RuleID, RuleName, VarianceThreshold) VALUES
+(1, 'IncidentRule', 150);
+
+
+##################################
+3.
+Create incident and update the table with Incident number
+
+import requests
+import json
+import pandas as pd
+
+# Create DataFrame from the provided data
+data = {
+    "CheckpointID": [901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 901, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902, 902],
+    "PartID": [3460, 3459, 3455, 3454, 3453, 3452, 3451, 3450, 3449, 3448, 3443, 3442, 3441, 3440, 3435, 3434, 3433, 3432, 3431, 3429, 3460, 3459, 3455, 3454, 3453, 3452, 3451, 3450, 3449, 3448, 3443, 3442, 3441, 3440, 3435, 3434, 3433, 3432, 3431, 3429],
+    "PartName": ["Engine Block", "Transmission", "Axle", "Brake Assembly", "Suspension System", "Fuel Tank", "Radiator", "Exhaust System", "Drive Shaft", "Steering Mechanism", "Tire", "Battery", "Air Filter", "Alternator", "Oil Filter", "Clutch", "Gearbox", "Differential", "Muffler", "Turbocharger", "Engine Block", "Transmission", "Axle", "Brake Assembly", "Suspension System", "Fuel Tank", "Radiator", "Exhaust System", "Drive Shaft", "Steering Mechanism", "Tire", "Battery", "Air Filter", "Alternator", "O...
+    "ManufacturingDate": ["1/15/2024", "1/17/2024", "1/20/2024", "1/25/2024", "1/30/2024", "2/5/2024", "2/10/2024", "2/15/2024", "2/20/2024", "2/25/2024", "3/1/2024", "3/5/2024", "3/10/2024", "3/15/2024", "3/20/2024", "3/25/2024", "3/30/2024", "4/5/2024", "4/10/2024", "4/15/2024", "1/15/2024", "1/17/2024", "1/20/2024", "1/25/2024", "1/30/2024", "2/5/2024", "2/10/2024", "2/15/2024", "2/20/2024", "2/25/2024", "3/1/2024", "3/5/2024", "3...
+    "Supplier": ["Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "Supplier A", "Supplier B", "Supplier C", "S...
+    "Quantity": [500, 400, 300, 600, 350, 450, 500, 400, 300, 600, 800, 350, 700, 400, 450, 500, 350, 400, 450, 300, 500, 400, 300, 600, 350, 450, 400, 400, 300, 600, 800, 300, 640, 400, 450, 480, 350, 400, 300, 300],
+    "ApplicationName": ["MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "MES", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP", "ERP"],
+    "PayloadCreateTime": ["4/15/2024 10:12:30 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/2024 10:15:35 AM", "4/15/20...
+}
+
+df = pd.DataFrame(data)
+
+# Pivot the data to get Quantity at MES and ERP
+pivot_df = df.pivot_table(index=["PartID", "PartName", "ManufacturingDate", "Supplier"], columns="ApplicationName", values="Quantity").reset_index()
+
+# Calculate variance
+pivot_df['Variance'] = (pivot_df['MES'] - pivot_df['ERP']).abs()
+
+# Add Incident column based on the variance condition
+pivot_df['Incident'] = pivot_df['Variance'].apply(lambda x: '')
+
+# Function to create an incident in ServiceNow
+def create_servicenow_incident(part_id, part_name, variance):
+    url = "https://<instance>.service-now.com/api/now/table/incident"
+    user = "<username>"
+    pwd = "<password>"
+    
+    headers = {"Content-Type":"application/json","Accept":"application/json"}
+    data = {
+        "short_description": f"Variance detected for Part ID: {part_id}, Part Name: {part_name}",
+        "description": f"The variance for Part ID: {part_id}, Part Name: {part_name} is {variance}.",
+        "category": "Variance",
+        "subcategory": "Threshold Breach",
+        "priority": "2"
+    }
+    
+    response = requests.post(url, auth=(user, pwd), headers=headers, data=json.dumps(data))
+    
+    if response.status_code != 201:
+        print(f"Failed to create incident for Part ID: {part_id}. Response: {response.status_code}, {response.content}")
+        return None
+    else:
+        incident_number = response.json()['result']['number']
+        print(f"Incident created for Part ID: {part_id}. Incident Number: {incident_number}")
+        return incident_number
+
+# Iterate over DataFrame and create incidents for rows with 'INCIDENT' in the 'Incident' column
+for index, row in pivot_df.iterrows():
+    if row['Variance'] >= 150:
+        incident_number = create_servicenow_incident(row['PartID'], row['PartName'], row['Variance'])
+        if incident_number:
+            pivot_df.at[index, 'Incident'] = incident_number
+
+import ace_tools as tools; tools.display_dataframe_to_user(name="Updated DataFrame with Incident Numbers", dataframe=pivot_df)
+
+pivot_df
